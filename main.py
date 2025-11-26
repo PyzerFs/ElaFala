@@ -4,6 +4,12 @@ from pydantic import BaseModel
 import google.generativeai as genai
 import os
 
+# ------------------------ CONFIG ---------------------------
+genai.configure(api_key=os.getenv("AIzaSyA-R6MWmakLrKkZlQXkOSUVmVhD5MXoZrI"))
+
+model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp")
+model_image = genai.GenerativeModel("gemini-2.0-flash-exp")  # melhor para imagens
+
 app = FastAPI()
 
 app.add_middleware(
@@ -13,82 +19,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-genai.configure(api_key=os.getenv("AIzaSyA-R6MWmakLrKkZlQXkOSUVmVhD5MXoZrI"))
-
-model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp")
-model_image = genai.GenerativeModel("gemini-2.0-flash-exp")  # melhor para imagens
-
 class Entrada(BaseModel):
     prompt: str
 
-
-def seguro(texto):
-    permitido = ["história", "conto", "lenda", "época", "passado", "era", "narrativa", "ficção"]
-    return any(p in texto.lower() for p in permitido)
-
+# ------------------------ API ------------------------------
 
 @app.post("/api/responder")
 async def responder(dados: Entrada):
 
-    texto_usuario = dados.prompt
+    entrada = dados.prompt
 
-    # segurança
-    if not seguro(texto_usuario):
-        resposta = (
-            "Posso apenas narrar histórias, contos e lendas. "
-            "Pergunte algo do mundo das narrativas."
-        )
+    prompt_texto = f"""
+    Você é uma narradora feminina da estética steampunk/revolução industrial.
+    Sua voz e suas respostas são literárias, poéticas e imersivas.
+    Crie uma resposta detalhada sobre:
 
-        audio = model.generate_content(
-            resposta,
-            generation_config={"audio_format": "mp3"}
-        )
+    "{entrada}"
 
-        return {
-            "texto": resposta,
-            "audioBase64": audio.audio["data"],
-            "imagens": []
-        }
-
-    # prompt literário
-    prompt = f"""
-    Você é uma narradora feminina da era da Revolução Industrial.
-    Seu estilo é poético, imersivo, cinematográfico e literário.
-
-    O usuário perguntou: "{texto_usuario}"
-
-    Crie uma narrativa detalhada e bonita sobre o tema.
-    Não fuja do tema histórias, contos ou narrativas.
+    Adote sempre tons narrativos.
     """
 
-    # gerar texto + áudio
+    # GEMINI → texto + áudio feminino
     resposta = model.generate_content(
-        prompt,
-        generation_config={"audio_format": "mp3"}
+        prompt_texto,
+        generation_config={
+            "audio_format": "mp3"
+        }
     )
 
     texto_final = resposta.text
-    audio_final = resposta.audio["data"]
+    audio_base64 = resposta.audio["data"]
 
-    # gerar IMAGEM ESTILO STEAMPUNK com o tema falado
-    img_prompt = f"""
-    Crie uma ilustração simples e clara estilo mapa mental,
-    no tema da Revolução Industrial,
-    representando: {texto_usuario}.
-    
-    Estilo: engrenagens, vapor, cobre, esquema simples,
-    fundo limpo, estética steampunk.
+    # -------- GERAR IMAGEM --------
+    prompt_img = f"""
+    Crie uma ilustração simples estilo "mapa mental", clara e direta,
+    com elementos steampunk (engrenagens, cobre, vapor), representando:
+    {entrada}.
+    Fundo limpo, forma simples, estética industrial.
     """
 
     imagem = model_image.generate_content(
-        img_prompt,
-        generation_config={"response_mime_type": "image/png"}
+        prompt_img,
+        generation_config={
+            "response_mime_type": "image/png"
+        }
     )
 
     imagem_base64 = imagem.image["data"]
 
     return {
         "texto": texto_final,
-        "audioBase64": audio_final,
+        "audioBase64": audio_base64,
         "imagens": [f"data:image/png;base64,{imagem_base64}"]
     }
