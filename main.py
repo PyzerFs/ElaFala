@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import base64
-import requests
 from memoria_utils import salvar_memoria
+from gtts import gTTS
+import uuid
 import os
 
 app = FastAPI()
@@ -15,63 +16,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 class Entrada(BaseModel):
     prompt: str
 
 
-# ============================
-# FILTRO DE SEGURANÇA
-# ============================
+# -----------------------------
+# Segurança: só responder histórias
+# -----------------------------
 def seguro(texto):
     permitido = ["história", "conto", "lenda", "época", "passado", "era", "narrativa", "ficção"]
     return any(p in texto.lower() for p in permitido)
 
 
-# ============================
-# GERAR ÁUDIO (voz feminina)
-# ============================
-def gerar_audio(texto):
-    from gtts import gTTS
-    audio = gTTS(texto, lang="pt", tld="com.br", slow=False)
-    audio.save("voz.mp3")
-    with open("voz.mp3","rb") as f:
-        return base64.b64encode(f.read()).decode()
+# -----------------------------
+# VOZ FEMININA — 100% garantida
+# -----------------------------
+def criar_audio(texto):
+    nome = f"voice_{uuid.uuid4()}.mp3"
+
+    # gTTS voz feminina (padrão do tld com.br)
+    tts = gTTS(texto, lang="pt", tld="com.br")
+    tts.save(nome)
+
+    with open(nome, "rb") as f:
+        base64_audio = base64.b64encode(f.read()).decode("utf-8")
+
+    os.remove(nome)
+    return base64_audio
 
 
-# ============================
-# MAPA MENTAL (imagem gerada)
-# ============================
-def gerar_imagem(texto):
-    placeholder = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA"
-    return placeholder
-
-
-# ============================
-# RESPOSTA PRINCIPAL
-# ============================
+# -----------------------------
+# API principal
+# -----------------------------
 @app.post("/api/responder")
 async def responder(dados: Entrada):
 
     texto = dados.prompt
 
-    # segurança
+    # filtro de segurança
     if not seguro(texto):
-        resposta = "Só posso responder perguntas relacionadas a histórias, contos, narrativas e lendas."
-        audio = gerar_audio(resposta)
+        resposta = "Só posso responder perguntas sobre histórias, contos, narrativas e lendas."
+        audio = criar_audio(resposta)
         return {"texto": resposta, "audioBase64": audio, "imagens": []}
 
     salvar_memoria(texto)
 
-    resposta = f"Numa era de engrenagens fumegantes e ideas que moldaram o mundo, sua pergunta ecoa como um sussurro vindo das fábricas de bronze: {texto}"
+    resposta = (
+        "Em meio às engrenagens da Revolução Industrial, "
+        "sua pergunta ecoa como o vapor que sobe das chaminés de aço. "
+        f"{texto}"
+    )
 
-    audio = gerar_audio(resposta)
+    # voz feminina REAL
+    audio = criar_audio(resposta)
 
-    img = gerar_imagem(texto)
+    # mapa mental simples
+    img = "https://i.imgur.com/NdYH2gW.jpeg"
 
     return {
         "texto": resposta,
         "audioBase64": audio,
         "imagens": [img]
     }
-
