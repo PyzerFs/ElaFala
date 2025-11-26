@@ -4,16 +4,13 @@ from pydantic import BaseModel
 import google.generativeai as genai
 import os
 
-# Configurar Gemini
 genai.configure(api_key=os.getenv("AIzaSyA-R6MWmakLrKkZlQXkOSUVmVhD5MXoZrI"))
 
-# Modelos
+# Modelos atualizados
 model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp")
 model_image = genai.GenerativeModel("gemini-2.0-flash-exp")
 
-
 app = FastAPI()
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,34 +31,34 @@ async def responder(dados: Entrada):
     pergunta = dados.prompt
 
     
-    # --------------------- TEXTO + ÁUDIO ---------------------
+    # ---------------- TEXTO + ÁUDIO ------------------
     resposta = model.generate_content(
-        contents=pergunta,
-        # Aqui você pede explicitamente ÁUDIO
+        contents=f"""
+        Você é uma narradora feminina da estética steampunk, poética e literária.
+        Responda de forma imersiva sobre:
+        "{pergunta}"
+        """,
         response_modalities=["text", "audio"]
     )
 
     texto_final = resposta.text
-    audio_data = resposta.audio.data  # <- Agora o SDK usa .data
+    audio_base64 = resposta.audio.data
 
-    
-    # ----------------------- IMAGEM --------------------------
+    # ---------------- IMAGEM --------------------------
     imagem_res = model_image.generate_content(
         contents=f"""
-            Gere uma imagem estilo mapa mental steampunk,
-            com engrenagens, vapor, metais, e elementos simples que representem:
-            "{pergunta}"
+        Gere uma imagem estilo mapa mental steampunk, 
+        com engrenagens, vapor, cobre e elementos clássicos,
+        representando visualmente o tema:
+        "{pergunta}"
         """,
-        # Aqui o campo correto para pedir imagem
         response_mime_type="image/png"
     )
 
-    imagem_base64 = imagem_res.image.data  # <- Nova sintaxe oficial
+    imagem_base64 = imagem_res.image.data
 
     return {
         "texto": texto_final,
-        "audioBase64": audio_data,
+        "audioBase64": audio_base64,
         "imagens": [f"data:image/png;base64,{imagem_base64}"]
     }
-
-    
