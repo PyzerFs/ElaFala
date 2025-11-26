@@ -106,9 +106,9 @@
         const API = "https://elafala.onrender.com/api/responder";
 
         let rec;
-        let listening = false;
-        let permissaoDada = false;
+        let permissao = false;
 
+        // -------------- MIC 100% SEM DELAY ------------------
         function iniciarReconhecimento() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             rec = new SpeechRecognition();
@@ -121,36 +121,37 @@
                 enviarParaAPI(texto);
             };
 
+            rec.onerror = () => {
+                // evita reiniciar várias vezes
+                if (!permissao) return;
+                setTimeout(() => rec.start(), 500);
+            };
+
             rec.onend = () => {
-                if (listening) rec.start();
+                if (permissao) rec.start();
             };
 
             rec.start();
-            listening = true;
-
-            document.getElementById("aviso").innerText = "Microfone ativado — fale comigo";
         }
 
-        // ▶ AQUI ESTÁ O SEU PEDIDO: clique na tela → pedir permissão
+        // -------------- PERMISSÃO POR CLIQUE NA TELA ---------
         window.addEventListener("click", async () => {
+            if (permissao) return;
 
-            if (!permissaoDada) {
-                try {
-                    // pedir permissão
-                    await navigator.mediaDevices.getUserMedia({ audio: true });
-                    permissaoDada = true;
+            try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+                permissao = true;
 
-                    // iniciar voz automaticamente
-                    iniciarReconhecimento();
+                iniciarReconhecimento();
+                document.getElementById("aviso").innerText = "Fale comigo";
 
-                } catch (err) {
-                    alert("Você precisa permitir o microfone para eu te ouvir.");
-                }
+            } catch (e) {
+                alert("Você precisa permitir o microfone.");
             }
+        }, { once: true });
 
-        }, { once: true });  // ← só executa UM clique
+        // ---------------- ENVIAR PARA API ---------------------
 
-        // ▶ Enviar para API
         async function enviarParaAPI(texto) {
             document.getElementById("resposta").innerText = "Processando…";
 
@@ -162,26 +163,36 @@
 
             const dados = await r.json();
 
+            // texto
             document.getElementById("resposta").innerText = dados.texto;
 
-            // voz feminina vindo da API
+            // voz
             if (dados.audioBase64) {
                 const audio = new Audio("data:audio/mp3;base64," + dados.audioBase64);
                 audio.play();
             }
 
-            // imagens
+            // imagens / mapa mental
             const imgs = document.getElementById("imagens");
             imgs.innerHTML = "";
-            dados.imagens.forEach(src => {
-                const img = new Image();
-                img.src = src;
-                imgs.appendChild(img);
-            });
+
+            if (dados.imagens) {
+                dados.imagens.forEach(src => {
+                    const img = new Image();
+                    img.src = src;
+                    img.style.width = "220px";
+                    img.style.border = "2px solid #ffaa00";
+                    img.style.margin = "10px";
+                    img.style.borderRadius = "8px";
+                    imgs.appendChild(img);
+                });
+            }
         }
     </script>
 
 
+
 </body>
+
 
 </html>
