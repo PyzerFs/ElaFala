@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Assistente IA</title>
+</head>
+
+<body>
+
+    <h1>Assistente de Voz IA</h1>
+
+    <div id="resposta"></div>
+    <div id="imagens"></div>
+
+    <script>
+        const API = "https://SUA-API-DO-RENDER.onrender.com/api/responder";
+
+        // reconhecimento de voz
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const rec = new SpeechRecognition();
+        rec.lang = "pt-BR";
+        rec.continuous = true;
+
+        window.addEventListener("click", () => { rec.start(); });
+
+        rec.onresult = (e) => {
+            let texto = e.results[e.resultIndex][0].transcript;
+            enviar(texto);
+        };
+
+        async function enviar(texto) {
+            let r = await fetch(API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: texto })
+            });
+
+            let dados = await r.json();
+            document.getElementById("resposta").innerText = dados.texto;
+
+            let imgs = document.getElementById("imagens");
+            imgs.innerHTML = "";
+            dados.imagens.forEach(src => {
+                let img = new Image();
+                img.src = src;
+                img.style.width = "200px";
+                imgs.appendChild(img);
+            });
+        }
+    </script>
+
+</body>
+
+</html>
