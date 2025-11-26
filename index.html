@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Assistente de Voz IA</title>
+
+    <style>
+        body {
+            max-height: 100vh, 100vw;
+            margin: 0;
+            padding: 0;
+            background: #0c0c0c;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            overflow-x: hidden;
+            background-image: url('https://static.todamateria.com.br/upload/im/ag/image5-cke.jpg');
+            background-size: cover;
+            background-attachment: fixed;
+            backdrop-filter: blur(4px);
+        }
+
+        .container {
+            width: 100%;
+            padding: 20px;
+            backdrop-filter: blur(6px) brightness(0.6);
+            background: rgba(0, 0, 0, 0.6);
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 48px;
+            text-align: center;
+            text-shadow: 0 0 20px #ffaa00;
+        }
+
+        .panel {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 30px;
+            border-radius: 16px;
+            border: 2px solid #ffaa00;
+            box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+            margin-top: 40px;
+        }
+
+        .avatar {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            margin: auto;
+            background-image: url('https://p.turbosquid.com/ts-thumb/gH/RAnPJF/TBYRX9sY/gears_31_sqrsignature_0000/jpg/1493389693/600x600/fit_q87/1acf0109f71425fa3b7681e72762b51f9b32895a/gears_31_sqrsignature_0000.jpg');
+            background-size: cover;
+            border: 3px solid #ffaa00;
+            box-shadow: 0 0 20px #ffaa00;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                filter: drop-shadow(0 0 10px #ffaa00);
+            }
+
+            50% {
+                filter: drop-shadow(0 0 25px #ffaa00);
+            }
+
+            100% {
+                filter: drop-shadow(0 0 10px #ffaa00);
+            }
+        }
+
+        #resposta {
+            white-space: pre-wrap;
+            margin-top: 20px;
+            font-size: 22px;
+            line-height: 1.6;
+        }
+
+        #imagens img {
+            width: 200px;
+            margin: 10px;
+            border: 2px solid #ffaa00;
+            box-shadow: 0 0 10px #ffaa00;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Conversas IA — Revolução Industrial</h1>
+
+        <div class="panel">
+            <div class="avatar"></div>
+
+            <div id="resposta">Fale comigo… estou ouvindo.</div>
+
+            <div id="imagens"></div>
+        </div>
+    </div>
+
+
+    <script>
+        const API = "https://elafala.onrender.com/api/responder";
+
+        // === RECONHECIMENTO DE VOZ ===
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const rec = new SpeechRecognition();
+        rec.lang = "pt-BR";
+        rec.continuous = true;
+
+        let liberado = false;
+
+        window.addEventListener("click", () => {
+            if (!liberado) {
+                rec.start();
+                liberado = true;
+            }
+        });
+
+        rec.onresult = (e) => {
+            let texto = e.results[e.resultIndex][0].transcript;
+            enviar(texto);
+        };
+
+        // === ENVIAR AO BACKEND ===
+        async function enviar(texto) {
+
+            let r = await fetch(API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: texto })
+            });
+
+            let dados = await r.json();
+
+            document.getElementById("resposta").innerText = dados.texto;
+
+            // reproduzir áudio
+            if (dados.audioBase64) {
+                let audio = new Audio("data:audio/mp3;base64," + dados.audioBase64);
+                audio.play();
+            }
+
+            // imagens
+            let imgs = document.getElementById("imagens");
+            imgs.innerHTML = "";
+            dados.imagens.forEach(src => {
+                let img = new Image();
+                img.src = src;
+                imgs.appendChild(img);
+            });
+        }
+    </script>
+
+</body>
+
+</html>
