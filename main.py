@@ -2,8 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
-import base64
-from memoria_utils import salvar_memoria
 import os
 
 app = FastAPI()
@@ -15,72 +13,82 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# CONFIG GEMINI
 genai.configure(api_key=os.getenv("AIzaSyA-R6MWmakLrKkZlQXkOSUVmVhD5MXoZrI"))
-model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
+model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp")
+model_image = genai.GenerativeModel("gemini-2.0-flash-exp")  # melhor para imagens
 
 class Entrada(BaseModel):
     prompt: str
 
 
-# -----------------------------
-# Segurança sobre HISTÓRIAS
-# -----------------------------
 def seguro(texto):
     permitido = ["história", "conto", "lenda", "época", "passado", "era", "narrativa", "ficção"]
     return any(p in texto.lower() for p in permitido)
 
 
-# -----------------------------
-# API PRINCIPAL - GEMINI
-# -----------------------------
 @app.post("/api/responder")
 async def responder(dados: Entrada):
 
-    texto = dados.prompt
+    texto_usuario = dados.prompt
 
-    # filtro de segurança
-    if not seguro(texto):
-        resposta = "Só posso falar sobre temas ligados a histórias, contos, eras passadas e narrativas."
-        
-        audio_response = model.generate_content(
-            contents=resposta,
+    # segurança
+    if not seguro(texto_usuario):
+        resposta = (
+            "Posso apenas narrar histórias, contos e lendas. "
+            "Pergunte algo do mundo das narrativas."
+        )
+
+        audio = model.generate_content(
+            resposta,
             generation_config={"audio_format": "mp3"}
         )
 
-        audio = audio_response.audio["data"]
-
         return {
             "texto": resposta,
-            "audioBase64": audio,
+            "audioBase64": audio.audio["data"],
             "imagens": []
         }
 
-    salvar_memoria(texto)
-
-    prompt_gemini = f"""
+    # prompt literário
+    prompt = f"""
     Você é uma narradora feminina da era da Revolução Industrial.
-    Responda de forma poética, literária e imersiva.
+    Seu estilo é poético, imersivo, cinematográfico e literário.
 
-    O usuário perguntou: "{texto}"
+    O usuário perguntou: "{texto_usuario}"
 
-    Regra: nunca saia do tema histórias, contos, lendas e narrativas.
+    Crie uma narrativa detalhada e bonita sobre o tema.
+    Não fuja do tema histórias, contos ou narrativas.
     """
 
-    # GEMINI → texto + voz feminina ao mesmo tempo
+    # gerar texto + áudio
     resposta = model.generate_content(
-        contents=prompt_gemini,
+        prompt,
         generation_config={"audio_format": "mp3"}
     )
 
     texto_final = resposta.text
-    audio_base64 = resposta.audio["data"]
+    audio_final = resposta.audio["data"]
 
-    imagem = "https://i.imgur.com/NdYH2gW.jpeg"
+    # gerar IMAGEM ESTILO STEAMPUNK com o tema falado
+    img_prompt = f"""
+    Crie uma ilustração simples e clara estilo mapa mental,
+    no tema da Revolução Industrial,
+    representando: {texto_usuario}.
+    
+    Estilo: engrenagens, vapor, cobre, esquema simples,
+    fundo limpo, estética steampunk.
+    """
+
+    imagem = model_image.generate_content(
+        img_prompt,
+        generation_config={"response_mime_type": "image/png"}
+    )
+
+    imagem_base64 = imagem.image["data"]
 
     return {
         "texto": texto_final,
-        "audioBase64": audio_base64,
-        "imagens": [imagem]
+        "audioBase64": audio_final,
+        "imagens": [f"data:image/png;base64,{imagem_base64}"]
     }
